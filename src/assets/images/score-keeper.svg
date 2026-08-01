@@ -1,0 +1,44 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer glow -->
+  <circle
+    cx="60"
+    cy="60"
+    r="52"
+    fill="#1A1328"
+    stroke="#5B21B6"
+    stroke-width="6"/>
+
+  <!-- Inner display -->
+  <rect
+    x="25"
+    y="35"
+    width="70"
+    height="50"
+    rx="10"
+    fill="#0F0B17"
+    stroke="#8B5CF6"
+    stroke-width="3"/>
+
+  <!-- Score -->
+  <text
+    x="60"
+    y="67"
+    text-anchor="middle"
+    font-family="Inter, sans-serif"
+    font-size="26"
+    font-weight="700"
+    fill="#F8F7FC">
+    42
+  </text>
+
+  <!-- Player indicators -->
+  <circle cx="38" cy="95" r="5" fill="#5B21B6"/>
+  <circle cx="82" cy="95" r="5" fill="#F59E0B"/>
+
+  <!-- Small victory sparkle -->
+  <path
+    d="M60 18 L64 28 L74 32 L64 36 L60 46 L56 36 L46 32 L56 28 Z"
+    fill="#F59E0B"/>
+
+</svg>

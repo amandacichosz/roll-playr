@@ -1,0 +1,72 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Outer glow -->
+  <circle
+    cx="60"
+    cy="60"
+    r="52"
+    fill="#1A1328"
+    stroke="#5B21B6"
+    stroke-width="6"/>
+
+  <!-- Inner selection panel -->
+  <circle
+    cx="60"
+    cy="55"
+    r="32"
+    fill="#0F0B17"
+    stroke="#8B5CF6"
+    stroke-width="3"/>
+
+  <!-- Player head -->
+  <circle
+    cx="60"
+    cy="43"
+    r="10"
+    fill="#F8F7FC"/>
+
+  <!-- Player body -->
+  <path
+    d="
+      M38 78
+      C38 63 48 56 60 56
+      C72 56 82 63 82 78
+      Z"
+    fill="#F8F7FC"/>
+
+  <!-- Selection highlight -->
+  <circle
+    cx="86"
+    cy="34"
+    r="10"
+    fill="#F59E0B"/>
+
+  <!-- Check mark -->
+  <path
+    d="M81 34 L85 38 L92 29"
+    fill="none"
+    stroke="#0F0B17"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Bottom player slots -->
+  <circle
+    cx="45"
+    cy="100"
+    r="4"
+    fill="#5B21B6"/>
+
+  <circle
+    cx="60"
+    cy="100"
+    r="4"
+    fill="#8B5CF6"/>
+
+  <circle
+    cx="75"
+    cy="100"
+    r="4"
+    fill="#34274D"/>
+
+</svg>
