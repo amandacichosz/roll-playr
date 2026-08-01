@@ -6,8 +6,9 @@
 </script>
 
 <template>
-  <div class="header p-4">
+  <div class="header flex items-end p-4">
     <img :src="logo" class="h-16"/>
+    <span class="pb-2">oll Playr</span>
   </div>
 </template>
 
