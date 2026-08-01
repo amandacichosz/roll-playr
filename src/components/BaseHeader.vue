@@ -6,7 +6,7 @@
 </script>
 
 <template>
-  <div class="header p-3">
+  <div class="header p-4">
     <img :src="logo" class="h-16"/>
   </div>
 </template>

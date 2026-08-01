@@ -12,7 +12,7 @@
       icon: playerPickr,
       link: '/tool-1'
     }, {
-      title: 'Score Keexper',
+      title: 'Score Keeper',
       icon: scoreKeeper,
       link: '/tool-2'
     }
@@ -21,8 +21,8 @@
 
 <template>
   <BaseHeader />
-  <div class="content">
-    <ul>
+  <div class="p-4">
+    <ul class="flex gap-2">
       <li v-for="tool in tools" :key="tool">
         <BaseCard :config="tool"/>
       </li>
