@@ -12,7 +12,7 @@
   --color-background: #0F0B17;
   --color-surface: #1A1328;
   --color-surface-elevated: #241A38;
-  --color-border: #34274D;
+  --color-border: #5E5276;
 
   /* Text */
   --color-text: #F8F7FC;
@@ -30,4 +30,8 @@ html, body {
   padding: 0;
   background: var(--color-surface);
   color: var(--color-text);
+}
+
+#app {
+  height: 100vh;
 }

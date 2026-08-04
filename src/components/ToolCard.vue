@@ -13,9 +13,23 @@ defineProps<{
 </script>
 
 <template>
-  <RouterLink :to="tool.link">
-      <BaseCard :title="tool.title">
-        <img :src="tool.icon" />
-      </BaseCard>
-  </RouterLink>
+  <div class="tool-card">
+    <RouterLink :to="tool.link">
+        <BaseCard>
+          <template #header>
+            <header class="card-header font-semibold text-2xl"> {{ tool.title }}</header>
+          </template>
+          <div class="flex justify-center">
+            <img :src="tool.icon" />
+          </div>
+        </BaseCard>
+    </RouterLink>
+  </div>
 </template>
+
+<style scoped>
+.tool-card:hover {
+  transform: translateY(-2px);
+  transition: 150ms;
+}
+</style>
