@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root {
+@theme {
   /* Brand */
   --color-primary: #5B21B6;
   --color-primary-hover: #6D28D9;

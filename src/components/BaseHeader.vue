@@ -1,8 +1,8 @@
 <script setup lang="ts">
-  import { ref } from 'vue'
-  import brandLogo from '@/assets/images/logo.svg'
+import { ref } from 'vue'
+import brandLogo from '@/assets/images/logo.svg'
 
-  const logo = ref(brandLogo)
+const logo = ref(brandLogo)
 </script>
 
 <template>
