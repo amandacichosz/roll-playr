@@ -41,6 +41,21 @@ npm run dev
 npm run build
 ```
 
+### Deploy to Cloudflare Workers
+
+On your first deploy, sign in to the Cloudflare account that hosts Roll Playr.
+
+```sh
+npx --yes wrangler@4.166.0 login
+```
+
+Build and deploy from the repository root. Wrangler uploads `dist` and prints the public URL.
+
+```sh
+npm run build
+npx --yes wrangler@4.166.0 deploy
+```
+
 ### Run Unit Tests with [Vitest](https://vitest.dev/)
 
 ```sh
