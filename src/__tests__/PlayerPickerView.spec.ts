@@ -52,6 +52,7 @@ it('picks one remaining touch after two seconds without joins or lifts', async (
   const wrapper = mount(PlayerPickerView)
   const surface = wrapper.get('.touch-surface')
   const winner = () => wrapper.find<HTMLDivElement>('.touch-circle--winner')
+  const trails = () => wrapper.findAll<HTMLDivElement>('.touch-trail')
   const first = { identifier: 4, clientX: 80, clientY: 160 }
   const second = { identifier: 7, clientX: 200, clientY: 300 }
   const third = { identifier: 9, clientX: 310, clientY: 450 }
@@ -65,12 +66,19 @@ it('picks one remaining touch after two seconds without joins or lifts', async (
   await surface.trigger('touchmove', { changedTouches: [{ ...third, clientX: 320 }] })
   expect(winner().exists()).toBe(false)
   expect(wrapper.findAll('.touch-circle')).toHaveLength(2)
+  expect(trails()).toHaveLength(0)
   expect(vibrate).not.toHaveBeenCalled()
 
   vi.advanceTimersByTime(1)
   await nextTick()
   expect(wrapper.findAll('.touch-circle')).toHaveLength(1)
   expect(winner().element.style.left).toBe('320px')
+  expect(trails()).toHaveLength(1)
+  const trail = trails()[0]!.element.style
+  expect(trail.left).toBe('80px')
+  expect(trail.top).toBe('160px')
+  expect(trail.getPropertyValue('--trail-length')).toBe(`${Math.hypot(240, 290)}px`)
+  expect(trail.getPropertyValue('--trail-angle')).toBe(`${Math.atan2(290, 240)}rad`)
   expect(vibrate).toHaveBeenCalledExactlyOnceWith(100)
 
   await surface.trigger('touchend', { changedTouches: [third] })
@@ -83,6 +91,7 @@ it('picks one remaining touch after two seconds without joins or lifts', async (
   expect(winner().exists()).toBe(true)
   await surface.trigger('touchstart', { changedTouches: [second] })
   expect(winner().exists()).toBe(false)
+  expect(trails()).toHaveLength(0)
   expect(wrapper.findAll('.touch-circle')).toHaveLength(1)
 })
 
