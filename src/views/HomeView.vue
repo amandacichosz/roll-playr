@@ -38,7 +38,7 @@ const tools = [
 
 <style scoped>
 .home {
-  width: 100%;
+  width: calc(100% - 84px);
   max-width: 56rem;
   margin-inline: auto;
   padding: clamp(1.75rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem);
