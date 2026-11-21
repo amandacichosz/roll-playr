@@ -47,6 +47,8 @@ it('picks one remaining touch after two seconds without joins or lifts', async (
   mockPrimaryPointer('coarse')
   vi.useFakeTimers()
   vi.spyOn(Math, 'random').mockReturnValue(0.75)
+  const vibrate = vi.fn()
+  vi.stubGlobal('navigator', { vibrate })
   const wrapper = mount(PlayerPickerView)
   const surface = wrapper.get('.touch-surface')
   const winner = () => wrapper.find<HTMLDivElement>('.touch-circle--winner')
@@ -63,16 +65,19 @@ it('picks one remaining touch after two seconds without joins or lifts', async (
   await surface.trigger('touchmove', { changedTouches: [{ ...third, clientX: 320 }] })
   expect(winner().exists()).toBe(false)
   expect(wrapper.findAll('.touch-circle')).toHaveLength(2)
+  expect(vibrate).not.toHaveBeenCalled()
 
   vi.advanceTimersByTime(1)
   await nextTick()
   expect(wrapper.findAll('.touch-circle')).toHaveLength(1)
   expect(winner().element.style.left).toBe('320px')
+  expect(vibrate).toHaveBeenCalledExactlyOnceWith(100)
 
   await surface.trigger('touchend', { changedTouches: [third] })
   vi.advanceTimersByTime(2000)
   await nextTick()
   expect(winner().element.style.left).toBe('320px')
+  expect(vibrate).toHaveBeenCalledTimes(1)
 
   await surface.trigger('touchend', { changedTouches: [first] })
   expect(winner().exists()).toBe(true)

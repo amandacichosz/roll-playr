@@ -21,6 +21,7 @@ function restartSelection() {
   selectionTimer = setTimeout(() => {
     const players = [...touches]
     winner.value = players[Math.floor(Math.random() * players.length)]
+    navigator.vibrate?.(100)
   }, selectionDelay)
 }
 
@@ -104,10 +105,10 @@ function removeTouches(event: TouchEvent) {
 
 .touch-circle {
   position: absolute;
-  width: 5rem;
+  width: 7.5rem;
   aspect-ratio: 1;
   translate: -50% -50%;
-  border: 3px solid currentColor;
+  border: 4px solid currentColor;
   border-radius: 50%;
   background: color-mix(in srgb, currentColor 32%, transparent);
   box-shadow: 0 0 1.5rem color-mix(in srgb, currentColor 65%, transparent);
@@ -116,10 +117,10 @@ function removeTouches(event: TouchEvent) {
 }
 
 .touch-circle--winner {
-  scale: 1.12;
+  scale: 0.85;
   background: color-mix(in srgb, currentColor 52%, transparent);
   box-shadow: 0 0 2rem color-mix(in srgb, currentColor 85%, transparent);
-  animation: touch-winner 550ms ease-out;
+  animation: touch-winner 850ms ease-in-out;
 }
 
 @keyframes touch-pulse {
@@ -139,12 +140,12 @@ function removeTouches(event: TouchEvent) {
     scale: 1;
   }
 
-  45% {
-    scale: 1.35;
+  40% {
+    scale: 1.65;
   }
 
   100% {
-    scale: 1.12;
+    scale: 0.85;
   }
 }
 
