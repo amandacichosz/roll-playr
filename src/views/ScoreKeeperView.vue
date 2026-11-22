@@ -1,25 +1,35 @@
 <script setup lang="ts">
+import BaseModal from '@/components/BaseModal.vue'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 
 type Score = number | null
+
+interface GameSettings {
+  winningCondition: 'highest' | 'lowest' | 'target'
+  roundLimit: number | null
+  pointTarget?: number
+}
 
 interface Game {
   players: string[]
   rounds: Score[][]
   selectedRound: number
   finished: boolean
+  settings?: GameSettings
 }
 
 const storageKey = 'roll-playr:score-keeper:v1'
 const initialsPattern = /^\p{L}{1,4}$/u
 const confettiColors = ['#c4b5fd', '#a78bfa', '#fbbf24', '#f472b6', '#67e8f9']
+const defaultSettings: GameSettings = { winningCondition: 'highest', roundLimit: null }
 
-function newGame(players: string[] = []): Game {
+function newGame(players: string[] = [], settings?: GameSettings): Game {
   return {
     players: [...players],
     rounds: [players.map(() => null)],
     selectedRound: 0,
     finished: false,
+    settings,
   }
 }
 
@@ -45,6 +55,24 @@ function loadGame(): Game {
       typeof saved.finished === 'boolean' &&
       (!saved.finished || saved.players.length > 0)
     ) {
+      const settings = saved.settings
+      if (
+        !settings ||
+        (settings.winningCondition !== 'highest' &&
+          settings.winningCondition !== 'lowest' &&
+          settings.winningCondition !== 'target') ||
+        (settings.winningCondition === 'target' &&
+          (settings.pointTarget === undefined ||
+            !Number.isSafeInteger(settings.pointTarget) ||
+            settings.pointTarget < 1)) ||
+        (settings.winningCondition !== 'target' &&
+          settings.roundLimit !== null &&
+          (!Number.isSafeInteger(settings.roundLimit) || settings.roundLimit < saved.rounds.length))
+      ) {
+        delete saved.settings
+      } else if (settings.winningCondition === 'target') {
+        settings.roundLimit = null
+      }
       return saved
     }
   } catch {
@@ -59,6 +87,12 @@ const playerError = ref('')
 const storageError = ref(false)
 const celebrate = ref(false)
 const editingRound = ref(false)
+const playerToRemove = ref<string | null>(null)
+const optionsOpen = ref(false)
+const draftWinningCondition = ref<GameSettings['winningCondition']>(defaultSettings.winningCondition)
+const draftRoundLimit = ref<number | ''>('')
+const draftPointTarget = ref<number | ''>('')
+const scoreEntryOrder = ref<{ player: string; index: number }[] | null>(null)
 const initialsInput = useTemplateRef<HTMLInputElement>('initialsInput')
 const roundHeading = useTemplateRef<HTMLHeadingElement>('roundHeading')
 const resultHeading = useTemplateRef<HTMLHeadingElement>('resultHeading')
@@ -68,6 +102,13 @@ const newGameDialog = useTemplateRef<HTMLDialogElement>('newGameDialog')
 const latestRound = computed(() => game.value.rounds.length - 1)
 const isCurrentRound = computed(() => game.value.selectedRound === latestRound.value)
 const selectedScores = computed(() => game.value.rounds[game.value.selectedRound]!)
+const settings = computed(() => game.value.settings ?? defaultSettings)
+const roundLimit = computed(() => settings.value.roundLimit)
+const isFinalRound = computed(() => roundLimit.value === game.value.rounds.length)
+const pointTarget = computed(() =>
+  settings.value.winningCondition === 'target' ? settings.value.pointTarget : undefined,
+)
+const optionsAvailable = computed(() => !game.value.finished)
 const totals = computed(() => {
   const scores = game.value.players.map(() => 0)
   for (const round of game.value.rounds) {
@@ -77,14 +118,37 @@ const totals = computed(() => {
   }
   return scores
 })
-const winningScore = computed(() =>
-  totals.value.reduce((best, total) => Math.max(best, total), -Infinity),
-)
+const rankedPlayers = computed(() => {
+  const scores = totals.value
+  const direction = settings.value.winningCondition === 'lowest' ? 1 : -1
+  return game.value.players
+    .map((player, index) => ({ player, index, total: scores[index]! }))
+    .sort((a, b) => direction * (a.total - b.total))
+})
+// Keep the focused score input in place until its entry is committed.
+const scorecardOrder = computed(() => scoreEntryOrder.value ?? rankedPlayers.value)
+const winningScore = computed(() => rankedPlayers.value[0]?.total)
 const winners = computed(() =>
   game.value.players.filter((_, index) => totals.value[index] === winningScore.value),
 )
 const winnerNames = computed(() =>
   new Intl.ListFormat(undefined, { type: 'conjunction' }).format(winners.value),
+)
+const targetReached = computed(() => {
+  const target = pointTarget.value
+  return target !== undefined && (winningScore.value ?? 0) >= target
+})
+const playersCloseToTarget = computed(() => {
+  const target = pointTarget.value
+  if (target === undefined || targetReached.value) return []
+
+  const threshold = target - Math.floor(target / 3)
+  return rankedPlayers.value.filter(({ total }) => total >= threshold)
+})
+const canFinish = computed(() =>
+  targetReached.value ||
+  (roundLimit.value === null && pointTarget.value === undefined) ||
+  (isCurrentRound.value && isFinalRound.value),
 )
 
 watch(
@@ -99,6 +163,33 @@ watch(
   },
   { deep: true },
 )
+
+function openOptions() {
+  if (!optionsAvailable.value) return
+  draftWinningCondition.value = settings.value.winningCondition
+  draftRoundLimit.value = roundLimit.value ?? ''
+  draftPointTarget.value = pointTarget.value ?? ''
+  optionsOpen.value = true
+}
+
+function saveOptions() {
+  const limit = draftWinningCondition.value === 'target' ? '' : draftRoundLimit.value
+  const target = draftPointTarget.value
+  if (limit !== '' && (!Number.isSafeInteger(limit) || limit < game.value.rounds.length)) return
+
+  const newSettings: GameSettings = {
+    winningCondition: draftWinningCondition.value,
+    roundLimit: limit === '' ? null : limit,
+  }
+  if (newSettings.winningCondition === 'target') {
+    if (target === '' || !Number.isSafeInteger(target) || target < 1) return
+    newSettings.pointTarget = target
+  }
+  game.value.settings = newSettings
+  optionsOpen.value = false
+}
+
+defineExpose({ openOptions, optionsAvailable })
 
 function addPlayer() {
   const player = initials.value.trim().toUpperCase()
@@ -120,7 +211,13 @@ function addPlayer() {
   initialsInput.value?.focus()
 }
 
-async function removePlayer(index: number) {
+async function removePlayer() {
+  if (playerToRemove.value === null) return
+
+  const index = game.value.players.indexOf(playerToRemove.value)
+  playerToRemove.value = null
+  if (index === -1) return
+
   game.value.players.splice(index, 1)
   for (const round of game.value.rounds) round.splice(index, 1)
 
@@ -143,9 +240,11 @@ function updateScore(index: number, event: Event) {
   }
 }
 
-function restoreScore(index: number, event: FocusEvent) {
+function commitScore(index: number, event: Event) {
   const input = event.target as HTMLInputElement
   input.value = String(selectedScores.value[index] ?? '')
+  scoreEntryOrder.value = null
+  if (targetReached.value) void finishGame()
 }
 
 async function selectRound(round: number) {
@@ -156,12 +255,15 @@ async function selectRound(round: number) {
 }
 
 function addRound() {
+  if (game.value.finished || isFinalRound.value || targetReached.value) return
   game.value.rounds.push(game.value.players.map(() => null))
   void selectRound(latestRound.value)
 }
 
 async function finishGame() {
+  if (game.value.finished || !game.value.players.length || !canFinish.value) return
   editingRound.value = false
+  scoreEntryOrder.value = null
   celebrate.value = true
   game.value.finished = true
   await nextTick()
@@ -170,7 +272,7 @@ async function finishGame() {
 
 async function startNewGame(keepPlayers: boolean) {
   newGameDialog.value?.close()
-  game.value = newGame(keepPlayers ? game.value.players : [])
+  game.value = newGame(keepPlayers ? game.value.players : [], game.value.settings)
   initials.value = ''
   playerError.value = ''
   celebrate.value = false
@@ -190,11 +292,20 @@ async function startNewGame(keepPlayers: boolean) {
     </p>
 
     <template v-if="!game.finished">
+      <div class="game-alerts" role="status" aria-atomic="true">
+        <p v-if="isFinalRound" class="game-alert">1 round left. This is the final round.</p>
+        <p v-if="targetReached" class="game-alert">
+          {{ winnerNames }} reached the {{ pointTarget }}-point target.
+        </p>
+        <p v-for="{ player, total } in playersCloseToTarget" :key="player" class="game-alert">
+          {{ player }} is close to winning with {{ total }} of {{ pointTarget }} points.
+        </p>
+      </div>
       <section class="panel" aria-labelledby="round-heading">
         <div class="round-bar">
           <div>
             <h2 id="round-heading" ref="roundHeading" tabindex="-1">
-              Round {{ game.selectedRound + 1 }}
+              Round {{ game.selectedRound + 1 }}{{ roundLimit === null ? '' : ` of ${roundLimit}` }}
             </h2>
             <p>
               {{
@@ -202,6 +313,9 @@ async function startNewGame(keepPlayers: boolean) {
                   ? 'Current round'
                   : `Past round · Round ${latestRound + 1} is current`
               }}
+              <template v-if="pointTarget !== undefined">
+                · First to {{ pointTarget }} points
+              </template>
             </p>
           </div>
           <div class="round-controls">
@@ -261,7 +375,7 @@ async function startNewGame(keepPlayers: boolean) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(player, index) in game.players" :key="player">
+            <tr v-for="{ player, index } in scorecardOrder" :key="player">
               <th scope="row">
                 <div class="player-name">
                   <span class="initials">{{ player }}</span>
@@ -271,7 +385,7 @@ async function startNewGame(keepPlayers: boolean) {
                     type="button"
                     :aria-label="`Remove ${player} and all their scores`"
                     :title="`Remove ${player}`"
-                    @click="removePlayer(index)"
+                    @click="playerToRemove = player"
                   >
                     <svg
                       width="16"
@@ -298,8 +412,10 @@ async function startNewGame(keepPlayers: boolean) {
                   placeholder="0"
                   :aria-label="`Round ${game.selectedRound + 1} score for ${player}`"
                   :value="selectedScores[index]"
+                  @focus="scoreEntryOrder = rankedPlayers"
                   @input="updateScore(index, $event)"
-                  @blur="restoreScore(index, $event)"
+                  @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+                  @blur="commitScore(index, $event)"
                 />
                 <span v-else>{{ selectedScores[index] ?? '—' }}</span>
               </td>
@@ -335,12 +451,25 @@ async function startNewGame(keepPlayers: boolean) {
       </section>
 
       <div v-if="game.players.length" class="game-actions">
-        <button class="button finish-button" type="button" @click="finishGame">Finish game</button>
-        <button v-if="isCurrentRound" class="button primary-button" type="button" @click="addRound">
+        <button
+          v-if="canFinish"
+          class="button finish-button"
+          :class="{ 'primary-button': isFinalRound || targetReached }"
+          type="button"
+          @click="finishGame"
+        >
+          Finish game
+        </button>
+        <button
+          v-if="isCurrentRound && !isFinalRound && !targetReached"
+          class="button primary-button"
+          type="button"
+          @click="addRound"
+        >
           Start next round
         </button>
         <button
-          v-else
+          v-if="!isCurrentRound && !targetReached"
           class="button primary-button"
           type="button"
           @click="selectRound(latestRound)"
@@ -348,6 +477,90 @@ async function startNewGame(keepPlayers: boolean) {
           Back to current round
         </button>
       </div>
+
+      <BaseModal
+        v-model:open="optionsOpen"
+        name="score-keeper-settings"
+        title="Score Keeper settings"
+        submit-label="Save settings"
+        @submit="saveOptions"
+      >
+        <fieldset class="game-settings">
+          <legend>Winning condition</legend>
+          <label class="winning-option">
+            <input
+              v-model="draftWinningCondition"
+              type="radio"
+              name="winning-condition"
+              value="highest"
+            />
+            Highest points
+          </label>
+          <label class="winning-option">
+            <input
+              v-model="draftWinningCondition"
+              type="radio"
+              name="winning-condition"
+              value="lowest"
+            />
+            Lowest points
+          </label>
+          <label class="winning-option">
+            <input
+              v-model="draftWinningCondition"
+              type="radio"
+              name="winning-condition"
+              value="target"
+            />
+            First to a point total
+          </label>
+          <label v-if="draftWinningCondition === 'target'" class="point-target">
+            Points to win
+            <input
+              v-model.number="draftPointTarget"
+              type="number"
+              placeholder="e.g. 200"
+              min="1"
+              :max="Number.MAX_SAFE_INTEGER"
+              step="1"
+              required
+            />
+          </label>
+        </fieldset>
+        <fieldset v-if="draftWinningCondition !== 'target'" class="game-settings round-settings">
+          <legend>Number of rounds</legend>
+          <input
+            v-model.number="draftRoundLimit"
+            type="number"
+            aria-label="Number of rounds"
+            aria-describedby="round-limit-hint"
+            placeholder="Unlimited"
+            :min="game.rounds.length"
+            :max="Number.MAX_SAFE_INTEGER"
+            step="1"
+          />
+          <p id="round-limit-hint" class="muted">
+            Leave blank for unlimited rounds.
+            <template v-if="game.rounds.length > 1">
+              A limit must include all {{ game.rounds.length }} rounds already started.
+            </template>
+          </p>
+        </fieldset>
+      </BaseModal>
+
+      <BaseModal
+        :open="playerToRemove !== null"
+        name="remove-player-dialog"
+        :title="`Remove ${playerToRemove ?? 'player'}?`"
+        aria-describedby="remove-player-description"
+        submit-label="Remove player"
+        @update:open="playerToRemove = null"
+        @submit="removePlayer"
+      >
+        <p id="remove-player-description">
+          Are you sure you want to remove {{ playerToRemove }} and all their scores?
+        </p>
+      </BaseModal>
     </template>
 
     <template v-else>
@@ -383,12 +596,12 @@ async function startNewGame(keepPlayers: boolean) {
           </span>
         </div>
         <div class="results-grid">
-          <div v-for="(player, index) in game.players" :key="player" class="player-result">
+          <div v-for="{ player, index, total } in rankedPlayers" :key="player" class="player-result">
             <div class="player-result-heading">
               <h3 class="initials">{{ player }}</h3>
               <p class="result-total">
                 <span class="muted">Total</span>
-                <strong class="total">{{ totals[index] }}</strong>
+                <strong class="total">{{ total }}</strong>
               </p>
             </div>
             <table class="scores results-table" :aria-label="`Round scores for ${player}`">
@@ -453,6 +666,47 @@ async function startNewGame(keepPlayers: boolean) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.game-settings legend {
+  margin-bottom: 0.375rem;
+  font-weight: 750;
+}
+
+.winning-option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.winning-option input {
+  width: 1.125rem;
+  min-height: auto;
+  height: 1.125rem;
+  padding: 0;
+  accent-color: var(--color-secondary);
+}
+
+.round-settings {
+  margin-top: 1rem;
+}
+
+.point-target {
+  display: grid;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.round-settings input,
+.point-target input {
+  width: 8rem;
+}
+
+.round-settings p {
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
 }
 
 .round-controls {
@@ -665,6 +919,23 @@ input::placeholder {
   flex-wrap: wrap;
   justify-content: flex-end;
   margin-top: 1rem;
+}
+
+.game-alerts {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.game-alerts:has(.game-alert) {
+  margin-bottom: 1rem;
+}
+
+.game-alert {
+  padding: 0.75rem 1rem;
+  border: 1px solid #a16207;
+  border-radius: 0.625rem;
+  background: #352715;
+  color: #fde68a;
 }
 
 .new-game-dialog {

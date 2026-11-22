@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, shallowRef } from 'vue'
+import { computed, onUnmounted, reactive, shallowRef, watch } from 'vue'
+import { splitIntoTeams } from '@/playerPickerTeams'
+
+const { teamCount = 0 } = defineProps<{ teamCount?: number }>()
 
 interface PlayerTouch {
   x: number
   y: number
   color: string
+  team?: number
 }
 
 const selectionDelay = 2000
@@ -13,16 +17,31 @@ const winner = shallowRef<{
   player: [number, PlayerTouch]
   trails: { id: number; touch: PlayerTouch; length: number; angle: number }[]
 }>()
-const visibleTouches = computed(() => (winner.value ? [winner.value.player] : [...touches]))
+const teamPlayers = shallowRef<[number, PlayerTouch][]>()
+const visibleTouches = computed(() => (winner.value ? [winner.value.player] : (teamPlayers.value ?? [...touches])))
+const status = computed(() => {
+  if (winner.value) return 'Player selected.'
+  return teamPlayers.value ? `${teamCount} teams assigned.` : ''
+})
 let nextColor = 0
 let selectionTimer: ReturnType<typeof setTimeout> | undefined
 
 function restartSelection() {
   clearTimeout(selectionTimer)
-  if (winner.value || touches.size === 0) return
+  if (winner.value || teamPlayers.value || touches.size < Math.max(1, teamCount)) return
 
   selectionTimer = setTimeout(() => {
     const players = [...touches]
+
+    if (teamCount) {
+      teamPlayers.value = splitIntoTeams(players, teamCount).flatMap((team, index) => {
+        const color = `hsl(${190 + index * 137.508} 85% 65%)`
+        return team.map<[number, PlayerTouch]>(([id, touch]) => [id, { ...touch, color, team: index + 1 }])
+      })
+      navigator.vibrate?.(100)
+      return
+    }
+
     const selectedIndex = Math.floor(Math.random() * players.length)
     const player = players[selectedIndex]!
     const [winnerId, winnerTouch] = player
@@ -39,6 +58,11 @@ function restartSelection() {
 }
 
 onUnmounted(() => clearTimeout(selectionTimer))
+watch(() => teamCount, () => {
+  winner.value = undefined
+  teamPlayers.value = undefined
+  restartSelection()
+})
 
 function updateTouches(event: TouchEvent) {
   const surface = event.currentTarget as HTMLElement
@@ -57,7 +81,10 @@ function updateTouches(event: TouchEvent) {
   }
 
   if (touches.size !== previousCount) {
-    if (previousCount === 0) winner.value = undefined
+    if (previousCount === 0) {
+      winner.value = undefined
+      teamPlayers.value = undefined
+    }
     restartSelection()
   }
 }
@@ -82,8 +109,11 @@ function removeTouches(event: TouchEvent) {
     @touchcancel="removeTouches"
     @contextmenu.prevent
   >
-    <p v-if="visibleTouches.length === 0">Touch and hold one finger per player.</p>
-    <span class="sr-only" role="status">{{ winner ? 'Player selected.' : '' }}</span>
+    <p v-if="teamCount && !teamPlayers && touches.size < teamCount" class="team-hint">
+      Hold at least {{ teamCount }} fingers, one per player.
+    </p>
+    <p v-else-if="visibleTouches.length === 0">Touch and hold one finger per player.</p>
+    <span class="sr-only" role="status">{{ status }}</span>
 
     <div
       v-for="{ id, touch, length, angle } in winner?.trails"
@@ -103,10 +133,12 @@ function removeTouches(event: TouchEvent) {
       v-for="[id, touch] in visibleTouches"
       :key="id"
       class="touch-circle"
-      :class="{ 'touch-circle--winner': winner }"
+      :class="{ 'touch-circle--winner': winner, 'touch-circle--team': touch.team }"
       aria-hidden="true"
       :style="{ left: `${touch.x}px`, top: `${touch.y}px`, color: touch.color }"
-    ></div>
+    >
+      <span v-if="touch.team" class="team-label">Team {{ touch.team }}</span>
+    </div>
   </div>
 </template>
 
@@ -130,6 +162,12 @@ function removeTouches(event: TouchEvent) {
   text-align: center;
 }
 
+.team-hint {
+  position: absolute;
+  inset: 1rem 1rem auto;
+  pointer-events: none;
+}
+
 .touch-circle,
 .touch-trail::before {
   position: absolute;
@@ -145,6 +183,22 @@ function removeTouches(event: TouchEvent) {
 
 .touch-circle {
   animation: touch-pulse 1.2s ease-in-out infinite;
+}
+
+.touch-circle--team {
+  display: grid;
+  width: 6rem;
+  place-items: center;
+  animation: none;
+}
+
+.team-label {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-weight: 750;
+  text-align: center;
 }
 
 .touch-trail {

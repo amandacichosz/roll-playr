@@ -7,6 +7,7 @@ defineProps<{
     description: string
     icon: string
     link: string
+    menu?: string
   }
 }>()
 </script>

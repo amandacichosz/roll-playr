@@ -1,6 +1,8 @@
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, expect, it, vi } from 'vitest'
+import DesktopPlayerPicker from '../components/DesktopPlayerPicker.vue'
+import MobilePlayerPicker from '../components/MobilePlayerPicker.vue'
 import PlayerPickerView from '../views/PlayerPickerView.vue'
 
 enableAutoUnmount(afterEach)
@@ -132,4 +134,64 @@ it('rolls for a first player from the desktop roster and can roll again', async 
   expect(wrapper.find('.winner').exists()).toBe(false)
 
   expect(form.get('[aria-label="Remove CD"]').text()).toContain('CD')
+})
+
+it('splits an odd desktop roster into balanced teams and preserves the roster when settings change', async () => {
+  vi.useFakeTimers()
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  const wrapper = mount(DesktopPlayerPicker, { props: { teamCount: 2 } })
+  const form = wrapper.get('form')
+  const roll = wrapper.get('.roll-button')
+  expect(roll.attributes('aria-disabled')).toBe('true')
+  const roster = ['AB', 'CD', 'EF', 'GH', 'IJ']
+  for (const player of roster) {
+    await form.get('input').setValue(player)
+    await form.trigger('submit')
+  }
+
+  await roll.trigger('click')
+  vi.advanceTimersByTime(750)
+  await nextTick()
+  const teams = wrapper.findAll('.team-results li p').map((team) => team.text().split(', '))
+  expect(teams.map((team) => team.length)).toEqual([3, 2])
+  expect(teams.flat().sort()).toEqual(roster)
+  expect(wrapper.find('.winner').exists()).toBe(false)
+
+  await roll.trigger('click')
+  await wrapper.setProps({ teamCount: 0 })
+  vi.advanceTimersByTime(750)
+  await nextTick()
+  expect(wrapper.find('.team-results').exists()).toBe(false)
+  expect(form.findAll('.player-list li')).toHaveLength(roster.length)
+  await roll.trigger('click')
+  vi.advanceTimersByTime(750)
+  await nextTick()
+  expect(wrapper.get('.winner strong').text()).toBe('AB')
+})
+
+it('waits for enough fingers, labels each mobile player by team, and keeps the result until the next round', async () => {
+  vi.useFakeTimers()
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  const wrapper = mount(MobilePlayerPicker, { props: { teamCount: 2 } })
+  const surface = wrapper.get('.touch-surface')
+  const touches = [1, 2, 3].map((identifier) => ({ identifier, clientX: identifier * 50, clientY: 100 }))
+  const teamLabels = () => wrapper.findAll('.team-label').map((label) => label.text())
+
+  await surface.trigger('touchstart', { changedTouches: touches.slice(0, 1) })
+  vi.advanceTimersByTime(2000)
+  await nextTick()
+  expect(teamLabels()).toHaveLength(0)
+  expect(wrapper.get('.team-hint').text()).toContain('at least 2 fingers')
+
+  await surface.trigger('touchstart', { changedTouches: touches.slice(1) })
+  vi.advanceTimersByTime(2000)
+  await nextTick()
+  expect(teamLabels().sort()).toEqual(['Team 1', 'Team 1', 'Team 2'])
+  expect(wrapper.get('[role="status"]').text()).toBe('2 teams assigned.')
+  expect(new Set(wrapper.findAll<HTMLDivElement>('.touch-circle').map(({ element }) => element.style.left)).size).toBe(3)
+
+  await surface.trigger('touchend', { changedTouches: touches })
+  expect(teamLabels()).toHaveLength(3)
+  await surface.trigger('touchstart', { changedTouches: touches.slice(0, 1) })
+  expect(teamLabels()).toHaveLength(0)
 })

@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
     <div class="dice-controls">
       <label for="dice-count">Number of dice</label>
       <select id="dice-count" v-model.number="diceCount" :disabled="rolling">
-        <option v-for="count in 5" :key="count" :value="count">{{ count }}</option>
+        <option v-for="count in 6" :key="count" :value="count">{{ count }}</option>
       </select>
     </div>
 

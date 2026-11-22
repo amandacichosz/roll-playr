@@ -1,16 +1,30 @@
 <script setup lang="ts">
-import { onUnmounted, ref, useTemplateRef } from 'vue'
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { splitIntoTeams } from '@/playerPickerTeams'
+
+const { teamCount = 0 } = defineProps<{ teamCount?: number }>()
 
 const rollDuration = 750
 const initials = ref('')
 const players = ref<string[]>([])
 const error = ref('')
-const winner = ref('')
+const result = ref<{ winner: string } | { teams: string[][] }>()
 const rolling = ref(false)
+const canRoll = computed(() => !rolling.value && players.value.length >= Math.max(1, teamCount))
+const rollLabel = computed(() => {
+  if (rolling.value) return teamCount ? 'Splitting teams…' : 'Rolling…'
+  if (teamCount) return result.value ? 'Shuffle teams again' : 'Split into teams'
+  return result.value ? 'Roll again' : 'Roll the die'
+})
 const initialsInput = useTemplateRef<HTMLInputElement>('initialsInput')
 let rollTimer: ReturnType<typeof setTimeout> | undefined
 
 onUnmounted(() => clearTimeout(rollTimer))
+watch(() => teamCount, () => {
+  clearTimeout(rollTimer)
+  rolling.value = false
+  result.value = undefined
+})
 
 function addPlayer() {
   if (rolling.value) return
@@ -24,7 +38,7 @@ function addPlayer() {
     players.value.push(player)
     initials.value = ''
     error.value = ''
-    winner.value = ''
+    result.value = undefined
   }
 
   initialsInput.value?.focus()
@@ -32,19 +46,21 @@ function addPlayer() {
 
 function removePlayer(player: string) {
   players.value = players.value.filter((initials) => initials !== player)
-  winner.value = ''
+  result.value = undefined
   error.value = ''
   initialsInput.value?.focus()
 }
 
 function roll() {
-  if (rolling.value || players.value.length === 0) return
+  if (!canRoll.value) return
 
-  const selected = players.value[Math.floor(Math.random() * players.value.length)]!
-  winner.value = ''
+  const selection = teamCount
+    ? { teams: splitIntoTeams(players.value, teamCount) }
+    : { winner: players.value[Math.floor(Math.random() * players.value.length)]! }
+  result.value = undefined
   rolling.value = true
   rollTimer = setTimeout(() => {
-    winner.value = selected
+    result.value = selection
     rolling.value = false
   }, rollDuration)
 }
@@ -81,18 +97,27 @@ function roll() {
       </fieldset>
     </form>
 
-    <section class="roll-area" aria-label="Roll for first player">
+    <section class="roll-area" :aria-label="teamCount ? 'Team selection' : 'Roll for first player'">
       <div role="status" aria-atomic="true">
-        <div v-if="winner" class="winner">
+        <div v-if="result && 'winner' in result" class="winner">
           <p>First player</p>
-          <strong>{{ winner }}</strong>
+          <strong>{{ result.winner }}</strong>
         </div>
+        <ul v-else-if="result && 'teams' in result" class="team-results" aria-label="Teams">
+          <li v-for="(team, index) in result.teams" :key="index">
+            <strong>Team {{ index + 1 }}</strong>
+            <p>{{ team.join(', ') }}</p>
+          </li>
+        </ul>
       </div>
 
+      <p v-if="teamCount && players.length < teamCount" class="team-hint">
+        Add at least {{ teamCount }} players to split into teams.
+      </p>
       <button
         class="roll-button"
         type="button"
-        :aria-disabled="rolling || players.length === 0"
+        :aria-disabled="!canRoll"
         @click="roll"
       >
         <span
@@ -103,7 +128,7 @@ function roll() {
         >
           <span v-for="pip in 5" :key="pip" class="pip"></span>
         </span>
-        <span>{{ rolling ? 'Rolling…' : winner ? 'Roll again' : 'Roll the die' }}</span>
+        <span>{{ rollLabel }}</span>
       </button>
     </section>
   </div>
@@ -223,6 +248,31 @@ function roll() {
 .roll-button[aria-disabled='true'] {
   color: var(--color-text-muted);
   cursor: default;
+}
+
+.team-hint {
+  margin-bottom: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.team-results {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.team-results li {
+  min-width: 7rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.625rem;
+  background: var(--color-surface);
+}
+
+.team-results strong {
+  color: #ddd6fe;
 }
 
 .die {

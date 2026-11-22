@@ -3,6 +3,7 @@ import ToolCard from '@/components/ToolCard.vue'
 import playerPickr from '@/assets/images/player-pickr.svg'
 import scoreKeeper from '@/assets/images/score-keeper.svg'
 import diceRoller from '@/assets/images/dice-roller.svg'
+import timer from '@/assets/images/timer.svg'
 
 const tools = [
   {
@@ -22,6 +23,12 @@ const tools = [
     description: 'Roll one or more dice.',
     icon: diceRoller,
     link: '/dice-roller',
+  },
+  {
+    title: 'Timer',
+    description: 'Track time for your activities.',
+    icon: timer,
+    link: '/timer',
   },
 ]
 </script>
